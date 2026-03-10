@@ -1,94 +1,56 @@
-# Diffie-Hellman & Caesar Cipher Chat 🛡️
+# RSA, Diffie-Hellman & Caesar Cipher Chat 🛡️
 
-Este repositório contém a implementação de um sistema de comunicação cliente-servidor via TCP, focado no aprendizado de conceitos fundamentais de criptografia e redes. O projeto evolui de uma cifra estática para uma troca de chaves dinâmica e segura utilizando o algoritmo Diffie-Hellman
+Este repositório contém a implementação de um sistema de comunicação cliente-servidor via TCP, focado no aprendizado de conceitos fundamentais de criptografia e redes. O projeto evolui de uma cifra estática para uma arquitetura robusta de **Múltiplas Camadas de Criptografia**, utilizando Diffie-Hellman protegido por RSA de 4096 bits, sem o uso de bibliotecas criptográficas prontas.
 
 ## 🚀 Sobre o Projeto
 
-O objetivo deste projeto é demonstrar como garantir a confidencialidade em uma rede. Ele está dividido em duas etapas principais:
+O objetivo deste projeto é demonstrar como garantir a confidencialidade em uma rede combinando criptografia simétrica e assimétrica. Ele foi desenvolvido em três etapas principais:
 
-1. **Criptografia de César:** Implementação básica de cifra de substituição com chave fixa.
+1. **Criptografia de César:** Implementação de cifra de substituição em fluxo contínuo.
 2. **Protocolo Diffie-Hellman:** Implementação de um aperto de mão (*handshake*) para estabelecer uma chave secreta compartilhada de forma dinâmica entre cliente e servidor.
+3. **Criptografia RSA (4096 bits):** Proteção das chaves trocadas no Diffie-Hellman utilizando chaves assimétricas gigantes. Para garantir a viabilidade da geração dessas chaves em tempo real, foi implementado o algoritmo **PrimoHyper** (baseado no teste de primalidade de Miller-Rabin).
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🛠️ Tecnologias e Conceitos Utilizados
 
 * **Linguagem:** Python 3.x
-* **Protocolo de Transporte:** TCP (Sockets)
-* **Conceitos de Criptografia:** Cifra de César, Aritmética Modular, Troca de Chaves Diffie-Hellman.
+* **Redes:** Protocolo de Transporte TCP (Sockets)
+* **Criptografia Simétrica:** Cifra de César (com chave dinâmica)
+* **Troca de Chaves:** Diffie-Hellman
+* **Criptografia Assimétrica:** RSA (Geração de chaves, encriptação e decriptação)
+* **Matemática Computacional:** Algoritmo PrimoHyper (Miller-Rabin) para geração eficiente de números primos de 2048 bits.
 
 ---
 
 ## 📂 Estrutura de Arquivos
 
-O projeto é composto por quatro scripts principais:
+O projeto principal é executado através de dois scripts que concentram toda a lógica de sockets e criptografia:
 
-### 1. Comunicação com Chave Fixa
+* `TCP_DiffieHellmanClient_v2.py`: Cliente TCP que gera suas chaves RSA, realiza o handshake Diffie-Hellman e inicia o chat cifrado.
+* `TCP_DiffieHellmanServer_v2.py`: Servidor TCP que gera suas chaves RSA, responde ao handshake, recebe mensagens em fluxo contínuo, processa (converte para maiúsculas) e devolve a resposta cifrada.
 
-* `Simple_tcpClient.py`: Cliente que utiliza uma `CHAVE_FIXA = 5` para cifrar mensagens antes de enviar ao servidor.
-* `Simple_tcpServer.py`: Servidor que recebe a mensagem, processa (converte para maiúsculas) e devolve a resposta.
-
-### 2. Comunicação com Diffie-Hellman
-
-* `TCP_DiffieHellmanClient.py`: Implementa a lógica de geração de chaves públicas ($A = g^a \pmod p$) e cálculo do segredo compartilhado.
-* `TCP_DiffieHellmanServer.py`: Realiza o cálculo simétrico ($B = g^b \pmod p$) e utiliza a chave resultante para decifrar as mensagens do cliente.
+*(Nota: Os nomes dos arquivos podem variar conforme a sua organização local, como `Simple_tcpClient.py` e `Simple_tcpServer.py`)*
 
 ---
 
-## 🔐 Como Funciona a Implementação
+## 🔐 Como Funciona a Implementação (O Handshake)
 
-### A Cifra de César (Camada de Cifragem)
+O fluxo de segurança do nosso projeto ocorre em três camadas sequenciais:
 
-A função `encriptar` utiliza o deslocamento de caracteres baseado na tabela ASCII (módulo 256) para garantir que qualquer caractere possa ser enviado com segurança básica:
+### 1. A Camada Assimétrica (RSA 4096 bits & PrimoHyper)
+Ao iniciar, tanto o Cliente quanto o Servidor geram um par de chaves RSA de 4096 bits. Para isso, o algoritmo **PrimoHyper** gera dois números primos gigantes (2048 bits cada) em questão de segundos. As chaves públicas ($e, N$) são trocadas em texto plano logo no início da conexão.
 
-```python
-def encriptar(texto, chave):
-    return "".join(chr((ord(char) + chave) % 256) for char in texto)
-```
+### 2. A Camada de Troca de Chaves (Diffie-Hellman Protegido)
+Para evitar que a chave de comunicação seja interceptada, utilizamos o algoritmo DH protegido pelo RSA:
+1. Ambos concordam com um primo ($P = 997$) e uma base ($G = 2$).
+2. Cada lado gera um número aleatório privado ($a$ e $b$).
+3. O Cliente calcula $R1$ (Valor Público A) e o Servidor calcula $R2$ (Valor Público B).
+4. **O pulo do gato:** O $R1$ é encriptado com a chave RSA do Servidor antes de ser enviado na rede. O $R2$ é encriptado com a chave RSA do Cliente. 
+5. Ambos decriptam os valores recebidos e calculam a mesma **Chave Simétrica Final (K)**.
 
-### O Protocolo Diffie-Hellman (Camada de Chave)
-
-Para evitar que a chave seja "hardcoded" (fixa), utilizamos o algoritmo DH:
-
-1. **Parâmetros Públicos:** Cliente e servidor concordam com um número primo ($p = 997$) e uma base ($g = 2$).
-2. **Segredos Privados:** Cada lado gera um número aleatório secreto ($a$ e $b$).
-3. **Troca Pública:** Eles trocam os resultados de $g^{segredo} \pmod p$.
-4. **Chave Final:** Ambos calculam o mesmo segredo $K$ de forma independente, sem que $K$ tenha transitado pela rede.
-
----
-
-## 🚦 Como Executar
-
-1. **Clone o repositório:**
-```bash
-git clone https://github.com/guigarciag/diffie-hellman-caesar-chat.git
-cd diffie-hellman-caesar-chat
-
-```
-
-
-2. **Inicie o Servidor:**
-```bash
-python TCP_DiffieHellmanServer.py
-```
-
-
-3. **Inicie o Cliente (em outro terminal):**
-```bash
-python TCP_DiffieHellmanClient.py
-```
-
-
-
-> **Nota:** Certifique-se de ajustar o endereço IP (`serverName`) nos arquivos do cliente para o IP onde o servidor está rodando (use `localhost` para testes locais).
-
----
-
-## 🛡️ Segurança e Fins Didáticos
-
-Este projeto possui **fins puramente educacionais**. A Cifra de César é vulnerável a ataques de força bruta e análise de frequência. O protocolo Diffie-Hellman aqui implementado utiliza números primos pequenos para facilitar a visualização dos cálculos, não sendo recomendado para aplicações em produção.
-
----
+### 3. A Camada de Cifragem de Mensagens (Cifra de César)
+Com a chave simétrica $K$ estabelecida secretamente, a função de chat entra em loop. A comunicação utiliza o deslocamento de caracteres baseado na tabela ASCII (módulo 256):
 
 ## 🎥 Vídeo Explicativo
 
